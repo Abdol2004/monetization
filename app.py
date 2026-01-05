@@ -12,33 +12,19 @@ import random
 import json
 import requests
 import re
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from selenium.webdriver.chrome.options import Options
 import sys
 
-# Fix Windows console encoding for emojis
+# Fix Windows console encoding for emojis (for local development)
 if sys.platform == 'win32':
-    import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    try:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    except:
+        pass
 
 # Load environment variables
 load_dotenv()
-
-# Windows-specific imports to bring window to foreground
-if sys.platform == 'win32':
-    try:
-        import win32gui
-        import win32con
-        HAS_WIN32 = True
-    except ImportError:
-        HAS_WIN32 = False
-else:
-    HAS_WIN32 = False
 
 # Flask app setup
 app = Flask(__name__)
@@ -276,6 +262,11 @@ class MongoDBManager:
             'total_all_time': total_all_time
         }
 
+# ============= Bot Classes (NOT USED ON SERVER - Bot runs on client PC) =============
+# These classes are kept for reference but not imported/used on server
+# The desktop client (client/bot_client.py) handles all bot logic
+
+"""
 # ============= Rage Bait Reply Generator =============
 class RageBaitGenerator:
     def __init__(self):
@@ -801,6 +792,7 @@ class XListBot:
                 self.log(f"⚠️ Error closing browser: {e}")
                 pass
         self.log("✅ Bot stopped successfully")
+"""
 
 # ============= Flask Routes =============
 @app.route('/')
@@ -925,55 +917,20 @@ def start_bot():
     if not current_user.is_premium:
         return jsonify({'success': False, 'message': 'Premium required'}), 403
 
-    # Check if bot exists and if it's actually running
-    if current_user.id in active_bots:
-        existing_bot = active_bots[current_user.id]
-        # Check if bot is still running
-        if existing_bot.running:
-            return jsonify({'success': False, 'message': 'Bot already running'})
-        else:
-            # Bot exists but not running - clean it up
-            try:
-                existing_bot.stop()
-            except:
-                pass
-            del active_bots[current_user.id]
-
-    # Capture user_id before starting thread (current_user won't be available in thread)
-    user_id = current_user.id
-    config = ConfigManager.load(user_id)
-
-    def log_callback(message):
-        socketio.emit('bot_log', {'message': message}, room=user_id)
-
-    bot = XListBot(user_id, callback=log_callback)
-    active_bots[user_id] = bot
-
-    thread = threading.Thread(target=bot.run, args=(config,), daemon=True)
-    thread.start()
-
-    return jsonify({'success': True, 'message': 'Bot started successfully'})
+    # Bot now runs on client PC via desktop client
+    return jsonify({
+        'success': False,
+        'message': 'Please download and run the desktop client to start the bot on your PC'
+    })
 
 @app.route('/api/bot/stop', methods=['POST'])
 @login_required
 def stop_bot():
-    try:
-        if current_user.id in active_bots:
-            bot = active_bots[current_user.id]
-            bot.stop()
-
-            # Wait a bit for the bot to stop
-            time.sleep(1)
-
-            # Remove from active bots
-            if current_user.id in active_bots:
-                del active_bots[current_user.id]
-
-            return jsonify({'success': True, 'message': 'Bot stopped successfully'})
-        else:
-            return jsonify({'success': False, 'message': 'No bot is currently running'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Error stopping bot: {str(e)}'})
+    # Bot now runs on client PC via desktop client
+    return jsonify({
+        'success': False,
+        'message': 'Bot runs on your PC. Close the desktop client to stop it.'
+    })
 
 # ============= Desktop Client API Endpoints =============
 @app.route('/api/client/login', methods=['POST'])
