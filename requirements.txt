@@ -1,9 +1,9 @@
+# Server dependencies (no Selenium/pywin32 - bot runs on client PC)
 Flask==3.0.0
 flask-socketio==5.3.5
 flask-login==0.6.3
 pymongo==4.6.1
 werkzeug==3.0.1
-selenium==4.16.0
 requests==2.31.0
 python-socketio==5.10.0
 gunicorn==21.2.0
@@ -11,4 +11,3 @@ eventlet==0.33.3
 dnspython==2.4.2
 python-dotenv==1.0.0
 certifi==2024.8.30
-pywin32==306
