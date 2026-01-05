@@ -1,0 +1,15 @@
+{
+  "mode": "viral_hunting",
+  "engagement_style": "controversial",
+  "targets": {
+    "replies_per_session": 400,
+    "engagement_threshold": 400,
+    "rest_duration_seconds": 1,
+    "replies_per_day": 1000
+  },
+  "x_lists": [
+    "https://x.com/i/lists/1995877357249270077",
+    "https://x.com/i/lists/1904483699346784446",
+    "https://x.com/i/lists/1911725019513684062"
+  ]
+}
