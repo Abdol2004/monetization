@@ -266,7 +266,6 @@ class MongoDBManager:
 # These classes are kept for reference but not imported/used on server
 # The desktop client (client/bot_client.py) handles all bot logic
 
-"""
 # ============= Rage Bait Reply Generator =============
 class RageBaitGenerator:
     def __init__(self):
@@ -792,7 +791,6 @@ class XListBot:
                 self.log(f"⚠️ Error closing browser: {e}")
                 pass
         self.log("✅ Bot stopped successfully")
-"""
 
 # ============= Flask Routes =============
 @app.route('/')
