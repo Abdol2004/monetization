@@ -8,6 +8,8 @@ import sys
 import time
 import requests
 import json
+import random
+import re
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -16,6 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 import socketio
+from ai_generator import AIReplyGenerator
 
 # Fix Windows console encoding
 if sys.platform == 'win32':
@@ -38,6 +41,9 @@ class BotClient:
         self.driver = None
         self.running = False
         self.sio = socketio.Client()
+        self.ai_generator = None  # Will be initialized after loading config
+        self.replied_tweets = set()  # Track replied tweets in memory
+        self.stats = {'replies_today': 0, 'errors': 0}
 
         # Setup socket events
         self.setup_socket_events()
@@ -107,7 +113,14 @@ class BotClient:
 
             if response.status_code == 200:
                 self.config = response.json()
+
+                # Initialize AI generator with Groq API key from server config
+                # For now, using hardcoded key - you can add it to server config
+                groq_api_key = "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"
+                self.ai_generator = AIReplyGenerator(groq_api_key)
+
                 self.log("✅ Configuration loaded")
+                self.log("✅ AI Generator initialized (Groq API only - no templates)")
                 return True
             else:
                 self.log("❌ Failed to load config")
@@ -256,23 +269,141 @@ class BotClient:
         target_replies = targets.get('replies_per_day', 1000)
 
         self.log(f"🎯 TARGET: {target_replies} replies today")
+        self.log(f"📊 Current count: {self.stats['replies_today']}/{target_replies}")
 
         for i, list_url in enumerate(x_lists, 1):
+            if not self.running or self.stats['replies_today'] >= target_replies:
+                break
+
             list_name = f"List {i}"
             self.log(f"📋 Loading: {list_name}")
 
             try:
                 self.driver.get(list_url)
-                time.sleep(5)
+                time.sleep(random.uniform(3, 5))
 
-                # Process tweets from this list
-                # (Add your tweet processing logic here)
+                # Scroll to load tweets
+                for _ in range(3):
+                    scroll_amount = random.randint(400, 800)
+                    self.driver.execute_script(f"window.scrollBy(0, {scroll_amount});")
+                    time.sleep(random.uniform(0.5, 1))
+
+                # Find tweets
+                tweets = self.driver.find_elements(By.CSS_SELECTOR, 'article[data-testid="tweet"]')
+                self.log(f"📊 Found {len(tweets)} tweets in {list_name}")
+
+                # Process each tweet
+                for tweet_elem in tweets:
+                    if not self.running or self.stats['replies_today'] >= target_replies:
+                        break
+
+                    try:
+                        tweet_data = self.extract_tweet_data(tweet_elem)
+                        if tweet_data and tweet_data['id'] not in self.replied_tweets:
+                            if self.reply_to_tweet(tweet_data, list_name):
+                                time.sleep(rest_duration)
+                    except Exception as e:
+                        continue
 
                 self.log(f"✅ Processed {list_name}")
             except Exception as e:
                 self.log(f"❌ Error loading {list_name}: {e}")
 
-            time.sleep(rest_duration)
+            time.sleep(random.uniform(2, 4))
+
+    def extract_tweet_data(self, tweet_element):
+        """Extract tweet information"""
+        try:
+            text_elem = tweet_element.find_element(By.CSS_SELECTOR, '[data-testid="tweetText"]')
+            tweet_text = text_elem.text
+
+            author_elem = tweet_element.find_element(By.CSS_SELECTOR, '[data-testid="User-Name"]')
+            author = author_elem.text.split('\n')[0].replace('@', '')
+
+            links = tweet_element.find_elements(By.TAG_NAME, 'a')
+            tweet_id = None
+            for link in links:
+                href = link.get_attribute('href')
+                if href and '/status/' in href:
+                    tweet_id = href.split('/status/')[-1].split('?')[0].split('/')[0]
+                    break
+
+            if not tweet_id or not tweet_text or len(tweet_text) < 10:
+                return None
+
+            return {
+                'text': tweet_text,
+                'author': author,
+                'id': tweet_id,
+                'element': tweet_element
+            }
+        except:
+            return None
+
+    def reply_to_tweet(self, tweet_data, list_name):
+        """Reply to a tweet using AI only"""
+        try:
+            # Generate AI reply (no templates)
+            reply = self.ai_generator.generate_reply(tweet_data['text'], tweet_data['author'])
+
+            if not reply:
+                self.log(f"⚠️ AI failed to generate reply - skipping tweet")
+                self.stats['errors'] += 1
+                return False
+
+            # Click reply button
+            try:
+                reply_btn = tweet_data['element'].find_element(By.CSS_SELECTOR, '[data-testid="reply"]')
+                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", reply_btn)
+                time.sleep(random.uniform(0.3, 0.7))
+                reply_btn.click()
+            except:
+                return False
+
+            time.sleep(random.uniform(0.5, 1))
+
+            # Type reply
+            try:
+                reply_box = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="tweetTextarea_0"]'))
+                )
+                # Human-like typing
+                for char in reply:
+                    reply_box.send_keys(char)
+                    time.sleep(random.uniform(0.02, 0.06))
+            except:
+                return False
+
+            time.sleep(random.uniform(0.5, 1))
+
+            # Send tweet
+            try:
+                send_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-testid="tweetButton"]')
+                send_btn.click()
+            except:
+                return False
+
+            # Track replied tweet
+            self.replied_tweets.add(tweet_data['id'])
+            self.stats['replies_today'] += 1
+
+            self.log(f"✅ [{self.stats['replies_today']}] @{tweet_data['author']}: {reply[:60]}...")
+
+            # Close modal
+            time.sleep(random.uniform(0.5, 1))
+            try:
+                close_btn = self.driver.find_element(By.CSS_SELECTOR, '[aria-label="Close"]')
+                close_btn.click()
+                time.sleep(random.uniform(0.3, 0.5))
+            except:
+                pass
+
+            return True
+
+        except Exception as e:
+            self.log(f"⚠️ Reply failed: {str(e)[:50]}")
+            self.stats['errors'] += 1
+            return False
 
     def stop(self):
         """Stop the bot"""
