@@ -117,110 +117,29 @@ class MonetizationDB:
             'total_all_time': total
         }
 
-# ============= Rage Bait Reply Generator =============
+# ============= AI Reply Generator (Groq API ONLY - No Templates) =============
 class RageBaitGenerator:
     def __init__(self):
         self.api_key = ConfigManager.GROK_API_KEY
         self.api_url = ConfigManager.GROK_API_URL
-        
-        # Massive rage bait templates
-        self.rage_templates = [
-            "This is exactly why {context} is failing. Everyone sees it but you.",
-            "Respectfully, you're missing {context} completely here.",
-            "This take aged like milk. {context} proves otherwise.",
-            "Tell me you don't understand {context} without telling me.",
-            "Everyone's hyping this but ignoring {context}.",
-            "Unpopular opinion: {context} makes this irrelevant.",
-            "This would work if {context} wasn't literally proven wrong.",
-            "Nah. {context} contradicts this entirely.",
-            "The {context} issue alone destroys this argument.",
-            "Am I the only one seeing {context} as the obvious problem?",
-            "This is why {context} keeps winning. Y'all miss the point.",
-            "Cool story until you factor in {context}.",
-            "Everyone celebrating while {context} exists is wild.",
-            "This ignores {context} and it shows.",
-            "Hard disagree. {context} is what actually matters.",
-            "Y'all forgot {context} and it's embarrassing.",
-            "The {context} in the room nobody wants to address.",
-            "This take falls apart when you consider {context}.",
-            "Imagine thinking this works with {context} right there.",
-            "But what about {context} though? Exactly.",
-            "{context} has entered the chat and it's over.",
-            "This aged poorly. {context} was always the issue.",
-            "Everyone ignoring {context} and wondering why it failed.",
-            "The fact that nobody mentions {context} says everything.",
-            "This sounds smart until you realize {context}.",
-            "Wrong. {context} is the actual answer.",
-            "{context} watching this take: 💀",
-            "POV: you've never heard of {context}",
-            "My brother in Christ, {context} exists.",
-            "This giving 'I forgot {context}' energy.",
-            "The {context} disrespect is insane.",
-            "{context} literally disproves this.",
-            "Show me the data on {context}. I'll wait.",
-            "This works until {context} enters the equation.",
-            "Y'all really out here ignoring {context}.",
-            "The {context} problem makes this irrelevant.",
-            "Everyone's wrong about this. {context} is clear.",
-            "This is cap. {context} proves it.",
-            "Controversial but {context} says otherwise.",
-            "Not sorry but {context} kills this argument.",
-            "The {context} factor alone is a dealbreaker.",
-            "This aged like fine milk. {context} >>",
-            "Genuinely asking: what about {context}?",
-            "How do you explain {context} with this logic?",
-            "But doesn't {context} contradict this?",
-            "Real question: where does {context} fit?",
-            "Help me understand {context} in this scenario.",
-            "Curious how {context} doesn't break this.",
-            "What's your take on {context} here?",
-            "So we're just ignoring {context} now?",
-            "Bold claim considering {context} exists.",
-        ]
-        
-        self.context_fillers = [
-            "the implementation", "scalability", "real-world data", "basic economics",
-            "market reality", "historical precedent", "the obvious solution", "proven strategies",
-            "actual results", "the fundamentals", "expert consensus", "the track record",
-            "opportunity cost", "the incentive structure", "game theory", "network effects",
-            "distribution", "execution risk", "technical debt", "user experience",
-            "the core problem", "regulatory reality", "competitive dynamics", "unit economics",
-            "customer acquisition", "the GTM strategy", "product-market fit", "sustainable growth",
-            "liquidity", "tokenomics", "smart contract risk", "on-chain data",
-            "the protocol design", "decentralization", "consensus mechanisms", "gas optimization"
-        ]
-    
+
     def detect_language(self, text):
         chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
         return 'chinese' if len(chinese_chars) > 3 else 'english'
-    
+
     def generate_reply(self, tweet_text, author):
-        """Generate rage bait reply - 50% templates, 50% Groq AI"""
+        """Generate reply using Groq AI ONLY - no template fallback"""
         language = self.detect_language(tweet_text)
-        
-        # For non-English, always use AI
-        if language != 'english':
-            return self.generate_with_ai(tweet_text, author, language)
-        
-        # 50/50 split for English
-        if random.random() < 0.5:
-            # Use template
-            template = random.choice(self.rage_templates)
-            context = random.choice(self.context_fillers)
-            reply = template.format(context=context)
-            return reply[:280]
-        else:
-            # Use AI
-            return self.generate_with_ai(tweet_text, author, language)
-    
+        return self.generate_with_ai(tweet_text, author, language)
+
     def generate_with_ai(self, tweet_text, author, language='english'):
-        """Generate with Groq AI"""
+        """Generate with Groq AI - returns None if API fails"""
         try:
             if language == 'chinese':
                 system_prompt = "你是社交媒体专家。用中文回复，要有争议性但礼貌。让人想互动。40字内，不用话题标签。"
             else:
                 system_prompt = "You're a viral engagement expert. Reply with controlled controversy and criticism that sparks heated discussion. Be provocative but not offensive. Challenge the main point boldly. Make people want to argue back. Under 40 words. NO hashtags."
-            
+
             response = requests.post(
                 self.api_url,
                 headers={
@@ -238,24 +157,21 @@ class RageBaitGenerator:
                 },
                 timeout=15
             )
-            
+
             if response.status_code == 200:
                 reply = response.json()['choices'][0]['message']['content'].strip()
                 reply = ' '.join([w for w in reply.split() if not w.startswith('#')])
                 reply = reply.strip('"\'')
                 return reply[:280]
             else:
-                # Fallback to template
-                template = random.choice(self.rage_templates)
-                context = random.choice(self.context_fillers)
-                return template.format(context=context)[:280]
-                
+                # API failed - return None (no template fallback)
+                print(f"❌ Groq API Error: Status {response.status_code}")
+                return None
+
         except Exception as e:
-            print(f"AI Error: {str(e)}")
-            # Fallback to template
-            template = random.choice(self.rage_templates)
-            context = random.choice(self.context_fillers)
-            return template.format(context=context)[:280]
+            print(f"❌ AI Error: {str(e)}")
+            # Return None instead of template fallback
+            return None
 
 # ============= Human Simulator =============
 class HumanSimulator:
@@ -727,7 +643,7 @@ class ModernGUI:
         self.log_message("🔥 X List Rage Bot - Ready to dominate")
         self.log_message("🎯 Mission: 1000 critical replies per day")
         self.log_message("⚡ Working exclusively with your 3 X lists")
-        self.log_message("💬 50% AI + 50% Templates for maximum engagement")
+        self.log_message("🤖 100% Groq AI - NO template fallbacks")
     
     def log_message(self, message):
         timestamp = datetime.now().strftime("%H:%M:%S")
